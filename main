@@ -1,0 +1,237 @@
+---
+title: "HW2 (125 points)"
+author: "STAT 131A, Spring 2022"
+date: "Due Friday, March 4"
+output:
+  pdf_document
+header-includes:
+- \usepackage{framed}
+- \usepackage{xcolor}
+- \let\oldquote=\quote
+- \let\endoldquote=\endquote
+- \colorlet{shadecolor}{orange!15}
+- \renewenvironment{quote}{\begin{shaded*}\begin{oldquote}}{\end{oldquote}\end{shaded*}}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, tidy.opts=list(width.cutoff=60), tidy=TRUE)
+library(tidyverse)
+```
+
+**Question 1.** Below I have copied over a function for running a permutation test from the book (and lab) that you can use for the rest of this homework. 
+
+```{r permFunction}
+permutation.test <- function(group1,group2, FUN, repetitions){ 
+  makePermutedStats<-function(){
+      sampled <- sample(1:length(c(group1,group2)), size=length(group1),replace=FALSE)
+      return(FUN(c(group1,group2)[sampled], c(group1,group2)[-sampled]))
+  }
+  stat.obs <- FUN(group1,  group2)
+  stat.permute <-replicate(repetitions,makePermutedStats()) 
+  p.value <- sum(stat.permute >= stat.obs) / repetitions
+  return(list(p.value=p.value,observedStat=stat.obs,permutedStats=stat.permute))
+}
+```
+
+a. (10 points) Inside `permutation.test` there is a function defined called `makePermutedStats`. I claim that this function simulates a single permutation of the data and returns the statistic defined by `FUN` (given by the user). Explain in detail how this function works and why this is a correct implementation for calculating the statistic of a single permutation of the data. 
+
+> The first line creates "sampled", a vector of random values with the same length as group1. These values are randomly sampled without replacement from 1 to the length of both samples combined. The result is a list of indexes from the original sample, with the same length as group1. The second line then sets up the two random permutations, one copntaining the values indexed by "sampled" and the other containing all the other values. Finally, it returns the output of FUN applied on the two permutations.
+
+b. (5 points) Now explain the rest of the function, i.e. what the 4 lines after the definition of `makePermutedStats` do. 
+
+> It first stores the observed statistic in stat.obs by applying FUN to the two real groups. Then it creates a list of permuted test statistics with length "repetitions" using makePermutedStats() and stores it in stat.permute. Finally, it calculates the p-value by finding the proportion of values in stat.permute more extreme than stat.obs, and returns it along with stat.obs and stat.permute.  
+
+**Question 2. Evaluating whether a test gives valid p-values** In this problem, we will go through a simple example of how you can use simulation from known distributions to determine whether a hypothesis test will perform well. We will only compare very simple settings, but this gives an idea of how you can use simulation to explore the performance of a test.
+
+A Type I error is where you wrongly reject the null hypothesis when in fact it is true. We have said in class that a hypothesis test is a valid test if it correctly controls Type I error for a given level, i.e. if you perform a hypothesis test at level 0.05 *when in fact the null hypothesis is true*, then you will incorrectly reject the null hypothesis 5% of the time. 
+
+ a. (15 points) Estimate the Type I error of the t-test when the data of the two groups is normal. Specifically, repeat the following simulation 10,000 times using the `replicate` function:
+ 
+ 1) Simulate two groups of data each with 20 observations from a normal distribution. For the first group, let the standard deviation be 2.5, and for the second group the standard deviation be 5; both groups have mean 10. 
+ 
+ 2) Calculate the p-value of the t-test on this simulated data. Based on these simulations, report the type I error of the t-test.
+ 
+```{r typeIErrorTtest}
+# Enter code here for function that creates a single simulation of the data 
+# and returns the p-value for that single simulation:
+f<-function(n = 20, mu1 = 10, mu2 = 10, sd1 = 2.5, sd2 = 5){
+  group1 = rnorm(n, mu1, sd1)
+  group2 = rnorm(n, mu2, sd2)
+  t.test(group1, group2)$p.value
+}
+# Enter code here that uses replicate to repeat this 10,000 times 
+type1_norm = replicate(10000, f())
+type1_error = sum(type1_norm <= 0.05) / 10000
+# Now use that output to estimate the Type I error.
+type1_error
+```
+ 
+ > The simulation estimates a type 1 error very close to 0.05, because I used 0.05 for the significance level alpha.  
+
+b. (10 points) Repeat the same simulation as above, only now make the data in both of the groups be generated from F distribution with parameters `df1=3` and `df2=24` (like in HW1); again make each group have 20 observations. What do you observe?
+
+```{r typeIErrorFdist_ttest}
+# Enter code here for simulation of the t-test from the F
+# Reuse the code from above as applicable
+f<-function(n = 20, df11 = 3, df12 = 24, df21 = 3, df22 = 24){
+  group1 = rnorm(n, df11, df12)
+  group2 = rnorm(n, df21, df22)
+  t.test(group1, group2)$p.value
+}
+
+type1_F = replicate(10000, f())
+type1_error = sum(type1_F <= 0.05) / 10000
+type1_error
+```
+
+ > I again observe a type 1 error close to 0.05.
+
+c. (15 points) We can also consider another type of error: when you do *not* reject the null, when in fact the two groups are different. This is called a Type II error and we can consider the probability of a test making a Type II error. An equivalent notion is that of the *power* of a test. The power is defined as the probability you will correctly reject the null when it is not true, i.e. power=1-P(Type II error).
+
+We are going to repeat the simulation from part (a), only now focusing on calculating the power of the t-test. To do this, I now want you do the simulations from (a) with the mean in group 2 greater than the mean in group 1 (so that the null hypothesis is not true). Specifically, 
+we are going to set the mean for group 2 be x units bigger than that of group 1, where x is going to be 1,2,3,4, and 5. 
+
+This requires you to redo the calculations in (a) for five different values. Instead of doing this manually, I want you to write a for-loop over the values of x. In other words, for each of x, your for-loop should calculate the power, i.e. the probability that the test *will* reject the null, under the same set up as part (a) but with the mean in group 2 greater than the mean in group 1.
+
+```{r power_ttest_diffMeans}
+# Enter code here for calculating the power for different changes in the mean
+# Reuse the code from a as applicable
+powers_c = sapply(1:5, function(x){
+  f<-function(n = 20, mu1 = 10, mu2 = 10+x, sd1 = 2.5, sd2 = 5){
+    group1 = rnorm(n, mu1, sd1)
+    group2 = rnorm(n, mu2, sd2)
+    t.test(group1, group2)$p.value
+  }
+  type1_norm = replicate(10000, f())
+  type1_error = sum(type1_norm <= 0.05) / 10000
+  type1_error
+})
+```
+
+ Demonstrate the results of your power calculations by plotting the power as a function of the difference in the means (i.e. power on y-axis, difference of the means on the x-axis). 
+
+```{r plot_power_ttest_diffMeans}
+# Enter code here for calculating the power for different changes in the mean
+# Reuse the code from a as applicable
+barplot(powers_c, 
+        names.arg = 1:5, 
+        xlab = 'Difference in Means',
+        ylab = 'Power')
+```
+ 
+ Interpret what these results mean.
+ 
+> The plot shows a clear trend that the farther apart two means are, the better power a t-test has to tell them apart (ie reject the null that the difference in their means is 0).
+
+d. (10 points) Repeat the above power simulation in part (c), only now instead of different choices of x, we are going to set x to be 1 (i.e. group 2 to have a mean 1 unit bigger than the mean of group 1). Instead we are going to consider different possible sample sizes of each group. 
+
+You should write a for-loop that calculates the power of the test as you change the sample size of each of the groups to be 10,15,20,30,50. 
+
+```{r power_ttest_sampleSize}
+# Enter code here for calculating the power for different sample sizes	
+# Reuse the code from (c) as applicable
+powers_d = sapply(c(10, 15, 20, 30, 50), function(x){
+  f<-function(n = x, mu1 = 10, mu2 = 10+1, sd1 = 2.5, sd2 = 5){
+    group1 = rnorm(n, mu1, sd1)
+    group2 = rnorm(n, mu2, sd2)
+    t.test(group1, group2)$p.value
+  }
+  type1_norm = replicate(10000, f())
+  type1_error = sum(type1_norm <= 0.05) / 10000
+  type1_error
+})
+```
+
+Similarly demonstrate the results by plotting the power as a function of the sample size and interpret the results.
+
+```{r plot_power_ttest_sampleSize}
+# Enter code here for calculating the power for different changes in the mean
+# Reuse the code from (c) as applicable
+barplot(powers_d, 
+        names.arg = c(10, 15, 20, 30, 50), 
+        xlab = 'Sample Size',
+        ylab = 'Power')
+```
+
+> There is a clear positive correlation between sample size and power. This is likely because a larger sample causes sigma hat to decrease, which reduces the overlap of the distributions and therefore increases the power.
+
+e. (5 points) How could you compare the validity and power of the permutation test using the t-statistic as compared to the t-test? (Just use words to describe what you would do, without actually coding it)
+
+> My answer is... 
+
+**Question 3.** Consider the data from HW1 containing information on predicting heart disease in patients. We have provided another copy of the data with this HW, to avoid having to find the data from last time, but it is the same dataset. Read the data in again,
+
+```{r readInData}
+heart<-read.csv("heartDisease.csv",header=TRUE)
+head(heart)
+#Factor conversion for future problems
+heart$cp = as.factor(heart$cp)
+heart$restecg = as.factor(heart$restecg)
+levels(heart$cp) = c('typical angina', 'atypical angina', 'non-anginal pain', 'asymptomatic')
+levels(heart$restecg) = c('normal', 'ST-T wave', 'ventricular hypertrophy')
+```
+
+a. (5 points) Perform a t-test comparing serum cholestoral in mg/dl (`chol`) between those patients with chest-pain type any type of angina (i.e. `cp` either `typical angina` or `atypical angina`) and those patients with non-anginal pain. What do you conclude?
+
+```{r ttest_anginaVsNonAngina}
+# code for running t-test
+group1 = filter(heart, cp == 'typical angina' | cp == 'atypical angina')$chol
+group2 = filter(heart, cp == 'non-anginal pain')$chol
+t.test(group1, group2)
+```
+
+> The p-value is well above 0.05. Therefore, we fail to reject the null hypothesis that the average serum cholesterol in patients with angina is equal to the average serum cholesterol in patients with non-anginal pain.
+
+b. (5 points) Repeat the above, using a permutation test based on the t-statistic instead and give your conclusions.
+
+```{r permtest_anginaVsNonAngina}
+# code for running permutation test
+# for cp column: 1 = typical angina, 2 = atypical angina, 3 = non-anginal pain, 4 = asymptomatic
+
+pvalue = permutation.test(group1, group2, function(g1, g2){t.test(g1, g2)$statistic}, 1000)[['p.value']]
+```
+
+> The p-value is again well above 0.05. Therefore, we fail to reject the null hypothesis.
+
+c. (10 points) Compare the null hypothesis of the t-test and the permutation test for this data by plotting the density curve for both null hypotheses on the same plot. For the permutation test, you should plot an kernel density estimate of the curve (not the histogram). Color the t-test black and the permutation test red and provide a legend. How do they compare? 
+
+```{r nullDensities}
+# code for plotting the densities of the two null distributions
+plot()
+```
+
+> My answer is ...
+
+d. (20 points) Of greater interest is the actual diagnosis (`num`). Recall, the diagnosis was encoded from 0-4, with 0 being no heart disease diagnosed. Use a permutation test based on the t-statistic to test the difference in the serum cholestoral in mg/dl  `chol` between all of these diagnosis levels, i.e. all pairwise comparisons. 
+
+Steps that you will need:
+ 
+* Create a matrix that gives all the pairwise combinations of the levels of `num` using the `combinations` function in the `gtools` package. You may need to install this package with `install.packages` if you are working on your own computer. 
+
+* Create a function that takes x, the pair of levels being compared, and calculates the results of the permutation test
+
+* Run this function on each combination using the `apply` function. 
+
+I will go over the code that you will need next week. You should reuse this code and adapt it to this problem. 
+
+Now add code, based on adapting the lecture code, to do pair-wise permutation tests of all of the (5) levels of diagnosis and interpret your results
+
+```{r multiplePermTests}
+# Code for doing permutation tests on all combinations
+
+```
+
+> My answer is ...
+
+e. (10 points) Use Bonferroni adjustments to correct for multiple testing of your above results. How did this affect your results?
+
+```{r Bonferroni}
+# code to use Bonferroni multiple testing correction
+
+```
+
+> My answer is ...
+
+f. (5 points) 125–200 mg/dL is a normal range of serum cholesteral, though it varies by person what is healthy. Given this, is the difference of means a good statistic, or would you propose a different statistic?
+
+> My answer is ...
