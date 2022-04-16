@@ -92,15 +92,15 @@ bootstrapLM <- function(y,x, repetitions, confidence.level=0.95){
 
 a (5 points) Explain what the function `bootFun` does. Specifically, what does the two lines of code within `bootFun` do? And what type of output does `bootFun` return? (a character string? A number? A vector? A list? A matrix?)
 
-> bootFun creates a bootstrap sample of x and y, then returns a list of the coefficients of their best fit line. Line 1 takes a sample of index values with replacement that's the same length as the data frame. Line 2 finds the best fit line between the x and y values of the sampled indexes, then returns the coefficients of the line as a list.
+> bootFun creates a bootstrap sample of x and y, then returns a list of the coefficients of their best fit line. Line 1 takes a sample of index values with replacement that's the same length as the data frame. Line 2 finds the best fit line between the x and y values of the sampled indexes, then returns the coefficients of the line as a list. The output is a named numeric vector.
 
 b (5 points) Explain what type of object `stat.boot` is (a character string? A number? A vector? A list? A matrix?) and describe what are its actual entries 
 
-> stat.boot is a vector
+> stat.boot is a matrix with the columns representing the bootstrap ID and the rows representing intercept/slope coefficients. The individual entries are doubles.  
 
 c (5 points) Explain what the line  of the code marked with *** does (marked above). 
 
-> My answer ...
+> It creates a matrix containing the 2.5 and 97.5 percentile (based on confidence.level) of all the intercept and slope coefficients. This is done by applying the quantile function over the rows of stat.boot. 
 
 
 ### Question 4
@@ -122,16 +122,21 @@ Let's consider this question. Look at the following variables: `MinutesOfSleep`,
 
 ```{r totalMinutes}
 # code to evaluate the total number of minutes
+totMinutes = fitbit$MinutesOfIntenseActivity + fitbit$MinutesOfLightActivity + fitbit$MinutesOfModerateActivity + fitbit$MinutesOfSleep + fitbit$MinutesOfSedentaryActivities
+summary(totMinutes)
 
 ```
 
-> My answer...
+> There are 1440 minutes in a day, and the quartiles shows that most data entries cover within 2-3 hours of the full day. However, the mean and minimum show that there is a significant left tail of days where the fitbit was barely active, and there are some values above 1440 minutes.
 
 b (5 points) Going forward, we are going to consider the question of whether the amount of sedentary activity is predictive of the minutes of sleep per night. We are going to first normalize our data, so that both of these quantities are out of the total amount of minutes recorded in the day with the device. Calculate the total number of minutes recorded each day in the five variables from part a (call it `totMinutes`), and make new variables `pctAsleep` and `pctSedentary` that are the percentage of all tracked minutes. Print out a `summary` of each of these two variables to show that it worked.
 
 ```{r makePercentVariables}
 #code to make new variables as percent of total minutes.
-
+pctAsleep = fitbit$MinutesOfSleep / totMinutes
+pctSedentary = fitbit$MinutesOfSedentaryActivities / totMinutes
+summary(pctAsleep)
+summary(pctSedentary)
 ```
 
 
@@ -139,40 +144,55 @@ c (10 points) Make a plot of `MinutesOfSleep` against `MinutesOfSedentaryActivit
 
 ```{r plotAsleepVsSedentary}
 # code to plot the two plots side-by-side
+par(mfrow = c(1, 2))
+with(plot(MinutesOfSedentaryActivities/60, MinutesOfSleep/60, ylab = 'Hours of Sleep', xlab = 'Hours of Sedentary'), data = fitbit) #converts to hours
+plot(pctSedentary, pctAsleep, ylab = 'Percentage of Time Asleep', xlab = 'Percentage of Time Sedentary')
 ```
 
-> My answer
+> Converting to percentages helped normalize the data, which tightened the data set together and gave the data points extra context about the total amount of time recorded that day.
 
 d (15 points) Plot the variable `pctAsleep` against `pctSedentary` like above, only now draw in the least squares regression line. Also print out the coefficients of the lines. Interpret the line and plots; be specific to this data -- e.g. as you increase percent of time spent in sedentary minutes by 10%, how is `pctAsleep` predicted to change?
 
 ```{r plotRegression}
 # Code here for plot with regression line
-
+lm.asleep.sedentary = lm(pctAsleep ~ pctSedentary)
+plot(pctSedentary, pctAsleep)
+abline(lm.asleep.sedentary)
+print(coef(lm.asleep.sedentary))
 ```
 
-> My answer
+> The line shows a shallow positive correlation which seems weakly correlated with the scatterplot. The linear regression shows that increasing pctSedentary by 10% should lead to pctAsleep increasing by 10*0.1492% = 1.492%.
 
 e (15 points) We might consider the effect of the (practically) zero levels of sedentary activity. Remove these points from the above analysis in d, and compare the results to that found in d, and draw conclusions as to the effect of these data points. What conclusion would you draw as to whether they should be included in the analysis? 
 
 ```{r plotRegressionNoZero}
 # Code here for plot with regression line removing zero sedentary
-
+# I used 0.1 as the minimum threshold of sedentary activity
+pctSedentaryAdj = pctSedentary[pctSedentary > 0.1]
+pctAsleepAdj = pctAsleep[pctSedentary > 0.1]
+lm.sa.adj = lm(pctAsleepAdj ~ pctSedentaryAdj)
+plot(pctSedentaryAdj, pctAsleepAdj, ylim = c(0,1), xlab = 'Percentage Time Sedentary', ylab = 'Percentage Time Asleep')
+abline(lm.sa.adj)
+coef(lm.sa.adj)
 ```
 
-> My answer
+> I believe they should be removed from the analysis, because we already know there are outlier data points where not enough time was recorded in the day from part a. Removing the 0 values of pctSedentary is akin to removing N/A values, as these data points do not represent a meaningful measurement. 
 
 f (20 points) Create bootstrap confidence intervals as well as parametric confidence intervals for the coefficients of the regression you found in e. (you can use the function from Question 3). Plot the resulting confidence intervals and compare them.
 
 ```{r bootCI}
 # Code here bootstrap and parametric confidence intervals
-
+library(tidyverse)
+bootstrapCI.sa = bootstrapLM(y = pctAsleepAdj, x = pctSedentaryAdj, 100)
+parametricCI.sa = confint(lm.sa.adj)
+# ggplot(aes(x = pctSedentaryAdj, y = pctAsleepAdj))
 ```
 
-> My answer
+> The bootstrap intervals are larger than the parametric intervals, and neither of them included 0. Therefore, the null hypothesis that the slope between pctAsleep and pctSedentary is zero was rejected. 
 
 g (5 points) We've seen that we do not always have all of the minutes of a day recorded. What affect could these missing minutes have on our above analysis? Be specific. A good idea is to first try to think of extreme examples of what could be happening in those minutes that might change your conclusion, so you can think about why not having that data might be a problem for your interpretation of the relationship between of sedentary activity and sleep levels. Then try to think of the best case scenario where lacking your data would not affect your results. Then return to the actual data (i.e. real life) and think how plausible it is to be worried about this problem. 
 
-> My answer
+> The main issue is that missing minutes introduces discrepancies in both pctAsleep and pctSedentary. If the missing minutes were spent sleeping or being sedentary, the respective variable is deflated and the opposing variable inflated in the data set. If the time was spent doing neither, both variables are higher than the true value they represent. In the best case scenario, the time is not spent sleeping or being sedentary, in which case both variables should be inflated equally, preserving their relationship. However, since FitBits are most useful for tracking exercise, it is most likely that the unrecorded time was spent sleeping or not exercising, so it poses a significant problem to the interpretation of data. 
 
 
 In the following questions, we will continue to work with the fitbit data, but we will modify the dataset. Below is code to convert the `Date` variable into a standard date class used by R, and then create variables that give the day of the week and the month of the date.
@@ -200,13 +220,15 @@ names(fitbit)<-gsub("Minutes","pctMin",names(fitbit)) #LINE 4
 names(fitbit)<-abbreviate(names(fitbit),10) #LINE 5
 ```
 
-> My answer
+> Line 3 converts each measurement of minutes in fitbit (MinutesOfSedentaryActivities, MinutesOfLightActivity, etc) into a proportion of the total time recorded that day. 
+> Line 4 replaces the "Minutes" portion of the column names with "pctMin" so they better represent the modified values. 
+> Line 5 abbreviates these column names to 10 characters using the abbreviate() algorithm. 
 
 For the rest of the problems, use this modified data frame.
 
 ### Question 6 (10 points) 
 
-Create a pairs plot of the continous variables in the dataset, except for `distance` and `plans`, and color code by points by the day of the week.  We have defined the colors for you in the following chunk with the vector `colWeek`. 
+Create a pairs plot of the continuous variables in the dataset, except for `distance` and `plans`, and color code by points by the day of the week.  We have defined the colors for you in the following chunk with the vector `colWeek`. 
 
 ```{r pairsPlot}
 colWeek<-palette()[1:nlevels(fitbit$Day)]
@@ -214,11 +236,12 @@ names(colWeek)<-levels(fitbit$Day)
 colWeek
 
 #Code for pairs plot here.
+pairs(fitbit[c(2, 3, 6:14)], col = colWeek)
 ```
 
 Comment which variables appear to have a strong pairwise relationship with `calorsBrnd`. 
 
-> My answer
+> steps is the only variable strongly related to calorsBrnd. 
 
 ### Question 7
 
@@ -226,7 +249,9 @@ Comment which variables appear to have a strong pairwise relationship with `calo
 
 ```{r plotByDate}
 # code to plot sedentary against date
-
+# fitbit$Date is adjusted to only have values corresponding to adjusted sedentary values
+plot(fitbit$Date[pctSedentary > 0.1], pctSedentaryAdj, col = colWeek)
+legend('topleft', levels(fitbit$Day), fill = colWeek, cex = 0.7)
 ```
 
 (b) (10 points) Draw loess lines for for each day of the week that fit the percent of sedentary activity as a function of date. The loess lines should all be on the same plot. Note that you will need to do `as.numeric` for the `fitbit$Date` object for loess to convert it from a date to a number for fitting the loess line. 
@@ -237,9 +262,19 @@ The first line of your code should set up a blank plot. Do this by reusing your 
 
 ```{r plotLoessPerDay}
 # code to plot loess lines
+fitbit.date.adj = fitbit[fitbit$pctMnOfSdA > 0.1, c('Date', 'Day', 'pctMnOfSdA')]
+fitbit.date.adj$Date = as.numeric(fitbit.date.adj$Date)
+with(fitbit.date.adj, plot(Date, pctMnOfSdA, type = 'n'))
+for (i in levels(fitbit$Day)){
+  dat = fitbit.date.adj[fitbit.date.adj$Day == i, c('Date', 'pctMnOfSdA')]
+  fitbit.lw = with(dat, loess(pctMnOfSdA ~ Date))
+  j = order(dat$Date)
+  lines(dat$Date[j], fitbit.lw$fitted[j], col = colWeek[i],  lwd = 2)
+}
+legend('topleft', levels(fitbit$Day), fill = colWeek, cex = 0.7)
 ```
 
 (c) (5 points) Comment on whether there are any differences due to the day of the week.
 
-> My answer
+> Saturday consistently has the least sedentary percentage, whereas weekdays like Monday-Wednesday are generally more sedentary. 
 
