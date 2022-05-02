@@ -1,0 +1,314 @@
+---
+title: "HW4 (176 points): DUE 5/2/2022"
+author: "STAT 131A Spring 2022"
+output:
+  pdf_document
+header-includes:
+- \usepackage{framed}
+- \usepackage{xcolor}
+- \let\oldquote=\quote
+- \let\endoldquote=\endquote
+- \colorlet{shadecolor}{orange!15}
+- \renewenvironment{quote}{\begin{shaded*}\begin{oldquote}}{\end{oldquote}\end{shaded*}}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,tidy=TRUE,tidy.opts=list(width.cutoff=50))
+```
+
+The first two questions are going to use multiple variable visualization tools (heatmaps and PCAs) to learn about an unknown dataset. This dataset comes from the daily measures of sensors in a urban waste water treatment plant [https://archive.ics.uci.edu/ml/datasets/Water+Treatment+Plant]. The measurements are all continuous, and are described in `VariableDescriptions.txt` file that comes with the homework. However, these are not "intuitive" variables, since they are measurements of various chemical properties of the water, so we don't expect you to understand the measurements. But we will use some of our visualization techniques to ge.knSD,nszDL?hn
+
+```{r}
+water <- read.csv(file = "water-treatment-cleaned.csv",
+header = TRUE, stringsAsFactors = FALSE)
+water$Month <- factor(water$Month, levels = month.name)
+water$Day <- factor(water$Day, levels = weekdays(x = as.Date(seq(7),
+origin = "1950-01-01")))
+water$Year <- factor(water$Year, levels = c(90, 91),
+labels = c("1990", "1991"))
+colDays <- palette()
+names(colDays) <- levels(water$Day)
+library(RColorBrewer)
+colMonths <- c("coral4", brewer.pal(11, "Spectral"))
+names(colMonths) <- levels(water$Month)
+colYear <- c("blue", "green")
+names(colYear) <- levels(water$Year)
+colSeason <- c("Blue", "Green", "Red", "Brown")
+names(colSeason) <- c("Winter", "Spring", "Summer", "Fall")
+# to be used for the colors of the heatmap:
+seqPal2 <- colorRampPalette(c("orange", "black", "blue"))(50)
+seqPal2 <- (c("yellow", "gold2", seqPal2))
+seqPal2 <- rev(seqPal2)
+```
+
+
+### Question 1:  Heatmaps
+
+a. (5 points) Create a simple heatmap of this data using `pheatmap` with: the color scale given by `seqPal2` (created above in the code you were given) and with `scale="columns"` so that the variables are centered and scaled to be comparable. Make sure you install the package `pheatmap` if needed. [Hint: you need to subset your data to only the numeric variables]. 
+
+You should easily see in this simple heatmap that this will not be a useful visualization without limiting the influence of outlier entries.
+
+```{r basicHeatmap, message=FALSE}
+library(pheatmap)
+# add code here for basic heatmap
+waterNum = water[6:43]
+pheatmap(waterNum, col = seqPal2, scale = 'column')
+```
+
+Next you are going to make a nice heatmap. Namely, the next questions are going to walk you through fixing the color scale like we did in class for the breast cancer data, and add information about the day, month, season, and year to the heatmap. [Hint: look at the .Rmd/.html file from the 04Chapter and the Lab that went through this]
+
+b. (5 points) Create a scaled version of the continuous variables of this dataset using the function `scale`, i.e. where the variables are on the same scale (centered with same st. dev). Call the new scaled dataset `waterScaled`. Save the categorical variables (`Month`,`Day`,`Year`,`Season` ) into separated datatset called `waterCat`. Once you have done that, uncomment the summary commands to demonstrate that you were successful. The commented code also puts the row names onto the data (which for some reason `scale` deletes)
+
+```{r scaleData}
+# Add code here for `waterScaled` and `waterCat`
+waterScaled = scale(waterNum)
+waterCat = water[2:5]
+# Uncomment this code
+row.names(waterScaled)<-row.names(water)
+summary(waterScaled[,1:5])
+
+summary(waterCat)
+```
+
+c. (10 points) Find new breakpoints for the data that span only the 0.05 and 0.95 quantiles of *all the scaled data*. 
+
+Use these breakpoints to create a better heatmap for the data. Note that the length of the breaks vector needs to be *one longer* than the length of the color vector (see `?pheatmap`).
+
+```{r betterBreakpoints}
+# Add code here for breakpoints
+
+```
+
+d. (10 points) Add annotation on the samples/days corresponding to `Month`,`Day`,`Year`,`Season` using the colors created above. 
+
+```{r betterHeatmap}
+
+# Add code here and fix existing code to get better heatmap
+
+```
+
+e. (5 points) Comment on the results of your heatmap? Does it help you find patterns in the variables? In the samples/days? Describe what patterns you see. You can look at the variable descriptions if you find it helpful, but you mainly need to describe the patterns you see in the heatmap.
+
+> My answer is...
+
+### Question 2: PCA
+
+a. (15 points) Perform a PCA of this data and plot a scatterplot of the samples based on the first 2 principal coordinates.
+
+```{r PCA}
+# add code here for pca and scatterplot
+waterPC = prcomp(waterNum)
+plot(waterPC$x[,1], waterPC$x[,2])
+```
+
+b. (10 points) There are 1-2 observations that seem perhaps far away from the other points and might be influencing our visualization or PCA. Identify them, and remove them and redo the PCA and the scatterplot.  In your R code, print out the date of the observation(s) you remove. 
+
+```{r PCAMinusOutliers}
+# add code here for pca and scatterplot
+
+
+# print the date outlying points
+```
+
+If you are interested, you can use the function `identify` to find these points (see help of `identify`). This is an interactive feature in R, but you can use it to find the points, and then once you find them, you can hard-code in your code which ones they are. This is just for interest -- you do not have to find them in this way.
+
+### Question 3:  Regression
+
+a. (2 points) I have a dataset containing average hourly earnings in dollars (wage) and years of education (educ) for 526 individuals. I fit a simple linear regression equation with wage as response and educ as the explanatory variable. This gave me the following equation: 
+
+wage = -0.90485 + 0.54136 * (educ). 
+
+Which among the following is the correct interpretation for this equation? Give reasons for your answer. 
+ 
+  (i) For every additional four years of education, the average hourly wage increases by 4*0.54 = 2.16 dollars. 
+  
+  (ii) For every additional year of education, the average hourly wage increases by 54%. 
+  
+  (iii) For every 1% increase in the number of years of education, the average hourly wage increases by 0.54%.
+  
+> (i) is the correct interpretation since the equation describes a linear relationship. Therefore, a constant change in education should lead to a constant change in hourly wage. Since 1% of education doesn't equal 1% of hourly wage, (ii) and (iii) are not correct. 
+
+b. (2 points) For the same dataset as in the previous part, I fit a simple linear regression equation with log(wage) as response and educ as the explanatory variable. This gave me the following equation: 
+
+log(wage) = 0.583773 + 0.082744 * (educ). 
+
+Which among the following is the correct interpretation for this equation? Give reasons for your answer. 
+
+  (i)  For every additional year of education, the average hourly wage increases by 0.0827 dollars. 
+  
+  (ii) For every additional year of education, the average hourly wage increases by 8.27 percent. 
+  
+  (iii) For every additional year of education, the average hourly wage increases by 0.0827 percent. 
+  
+> (ii) is the correct interpretation since an additional year of education increases log(wage) by a factor of 10^0.0827, and therefore increases by 8.27 percent. 
+
+c. (2 points) I have a dataset on the salaries of the CEOs of 209 firms (variable name is salary) along with the sales of the firm (variable is sales). The dataset is from the year 1990. Salary is in thousands of dollars and Sales is in millions of dollars. I fit a simple linear regression with log(salary) as the response variable and log(sales) as the explanatory variable and this gave me the equation:
+
+log(salary) = 4.822 + 0.25667 * log(sales). 
+
+Which among the following is the correct interpretation for this equation? Give reasons for your answer. 
+
+   (i)  For a 1 percent increase in sales, the CEO salary increases by 0.257 percent on average. 
+   
+   (ii) For a 1 million dollar increase in firm sales, the CEO salary increases by 25.667 thousand dollars on average. 
+   
+   (iii) For a 1 million dollar increase in firm sales, the CEO salary increases by 2.57 percent. 
+   
+> My answer ...
+
+
+### Question 4:  Regression output
+
+(15 points) The following is a the output of running `lm` on a subset of the imdb dataset you will work with below (Question 4). The below output above has five missing values which are indicated by XXAXX-XXFXX 
+Using only the available information in the above summary, fill in the missing values. I give you space below for R code, but this is just for using R as a calculator  -- you can't recreate this lm summary with the data given, because this is done on a random subset of the full dataset.
+
+```{r}
+
+```
+
+> My answer
+
+
+```
+ summary(lmMoviesSmall2)
+
+Call:
+lm(formula = imdb_score ~ ., data = moviesSmall2)
+
+Residuals:
+    Min      1Q  Median      3Q     Max 
+-3.6138 -0.4630  0.0876  0.5490  1.9408 
+
+Coefficients:
+                            Estimate Std. Error t value Pr(>|t|)    
+(Intercept)                4.425e+01  9.482e+00   4.667 3.84e-06 ***
+num_critic_for_reviews     2.540e-03  5.055e-04   5.025 6.78e-07 ***
+duration                   1.111e-02  1.710e-03   6.497 1.81e-10 ***
+director_facebook_likes    1.079e-05  1.095e-05   XXAXX    XXBXX    
+actor_3_facebook_likes     9.128e-05  5.226e-05   1.747  0.08126 .  
+actor_1_facebook_likes     8.848e-05  3.153e-05   2.807  0.00518 ** 
+gross                      1.662e-10  6.693e-10   0.248  0.80399    
+num_voted_users            3.746e-06  4.309e-07   8.694  < 2e-16 ***
+cast_total_facebook_likes -7.583e-05  3.127e-05  -2.425  0.01564 *  
+num_user_for_reviews      -7.565e-04  1.575e-04  -4.804 2.01e-06 ***
+budget                    -4.223e-09  1.025e-09  -4.122 4.33e-05 ***
+title_year                -1.973e-02  4.727e-03  -4.175 3.46e-05 ***
+actor_2_facebook_likes     6.026e-05  3.242e-05   1.859  0.06362 .  
+movie_facebook_likes      -1.150e-06  2.366e-06  -0.486  0.62723    
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 0.8023 on 558 degrees of freedom
+Multiple R-squared:  0.4432,	Adjusted R-squared:  0.4302 
+F-statistic: 34.16 on XXCXX and XXDXX DF,  p-value: XXFXX
+```
+
+
+### Question 5:  Regression with categorical predictors
+
+Consider the data in `ceodata_num.csv` which consists of 209 firms and has data on the salary of the CEO, sales of the firm, and the firm type. The data is from the year 1990. 
+
+```{r}
+ceodata<-read.csv("ceodata_num.csv")
+```
+
+`salary`: Salary of the CEO in thousands of dollars
+`sales`: Sales of company in millions of dollars
+`FirmType`: the type of company as numeric values 1-4 which correspond to:
+
+* 1=consumer product 
+* 2=finance
+* 3=industry
+* 4=utility 
+
+a (10 points) Fit a regression in R with `sales` and `FirmType` as a predictor of `salary`. Interpret each of the coefficient estimates given by R, except for the intercept.
+
+```{r}
+# Code for fitting regression here
+```
+
+> My answer ...
+
+b (10 points) Fit a regression that allows for a different slope for the different types of firms. Give a summary of the results and interpret each coefficient, except for the intercept. 
+
+```{r}
+# Code for different slopes for each type of firm
+```
+
+> My answer is
+
+c. (10 points) Evaluate whether this model in part b is an improvement over the model in part a. 
+
+```{r}
+# Code for evaluating model
+```
+
+> My answer is
+
+d. (20 points) Run diagnostics on the model you found in part a, and determine whether there are any problems with this model that should be addressed. If so, explain next steps you might take to try to improve this model. 
+
+```{r}
+# Code for diagnostics
+```
+
+>  My answer ...
+
+### Question 6: Variable selection
+
+Consider data from the website www.imdb.com giving scores of movies. Read in the data with the following code:
+
+```{r}
+movies<-read.csv("imdb_simplified.csv",header=TRUE)
+movies<-movies[,-grep("name",names(movies))]  ## LINE2
+movies<-movies[,!names(movies) %in% "movie_title"] ## LINE3
+```
+
+a. (5 points) In the code above, explain what LINE 2 and LINE3 are doing (see `?grep`).
+
+> My answer...
+
+b. (10 points) Find best submodel based on AIC,*without including the categorical variables (`genre` or `content_rating`)*. (Hint: If you use `regsubsets`, that function requires you to set `nvmax` as the maximum size submodel you want to consider, and thus have to set it larger than the largest possible model if you want to compare all possible sizes) 
+
+```{r}
+# The best submodel based on AIC
+```
+
+> The best model is...
+
+c. (10 points) Use CV to compare the best models of each possible size K, as found by comparing RSS. 
+
+```{r}
+# The best submodel based on CV
+```
+
+> The best model is...
+
+d. (5 points) Plot the AIC and CV as a function of model size, and comment on whether AIC and CV lead to the same answer. 
+
+```{r}
+# plots of aic and cv vs. model size
+```
+
+> My answer...
+
+e. (10 points) If you had far more variables, you would not be able to find the best among all submodels, and could use stepwise regression. Use the `step` function to find a good submodel (based on AIC). Does it find best model based on AIC? If not, report the AIC of the model `step` does find. 
+
+```{r}
+# applying step
+```
+
+> My answer...
+
+f. (5 points) In the help of `regsubsets` it states that it will not run if there are more than 50 variables (because it will take too long to try all of the submodels). 
+
+If I try to run `regsubsets` on the 15 explanatory variables in the dataset `movie`, i.e. include the categorical variables `genre` and `content_rating`,  it says that it has reached that limit:
+
+```
+> regsubsets(imdb_score~., movies,nvmax=30)
+Error in leaps.exhaustive(a, really.big) : 
+  Exhaustive search will be S L O W, must specify really.big=T
+```
+
+Given an explanation for how `regsubsets` determined there are more than 50 variables.
+
+> My answer...
