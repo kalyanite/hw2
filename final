@@ -1,0 +1,101 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE, tidy.opts=list(width.cutoff=60), tidy=TRUE)
+```
+
+# Loading Data
+```{r}
+# https://bcourses.berkeley.edu/courses/1513760/files/folder/Project?preview=83257560
+library(tidyverse)
+dat = read.csv('cholangitis.csv')
+dat$status = factor(dat$status, levels = c('C', 'CL', 'D'))
+dat$drug = factor(dat$drug, levels = c('D-penicillamine', 'Placebo'))
+dat$sex = factor(dat$sex, levels = c('M', 'F'))
+dat$ascites = factor(dat$ascites, levels = c('Y', 'N'))
+dat$hepatomegaly = factor(dat$hepatomegaly, levels = c('Y', 'N'))
+dat$spiders = factor(dat$spiders, levels = c('Y', 'N'))
+dat$edema = factor(dat$edema, levels = c('Y', 'N', 'S'))
+dat$stage = factor(dat$stage, levels = c('1', '2', '3', '4'))
+dat.loess = subset(dat, status != 'CL') #removing CL patients
+#                         response       |                            observed
+dat.cat = select(dat, 'n_days', 'status', 'drug', 'sex', 'ascites', 'hepatomegaly', 'spiders', 'edema', 'stage') %>% na.omit()
+dat.num = select(dat, "n_days", 'status', "bilirubin", "cholesterol", "albumin" , "copper", "alk_phos", "sgot", "tryglicerides", "platelets", "prothrombin") %>% na.omit()
+```
+
+# Exploratory Analysis
+
+```{r}
+# comparing numerical variables with status 
+dat.num.d = filter(dat.num, status == 'D')
+dat.num.c = filter(dat.num, status == 'C')
+#par(mfrow = c(8, 1))
+for (i in 1:9){
+  dat.num.c[, i+2] %>% density() %>% plot(main = colnames(dat.num.c)[i+2], col = 'green')
+  dat.num.d[, i+2] %>% density() %>% lines(main = '', col = 'red')
+}
+```
+> Bilirubin, albumin, copper, sgot, and prothrombin seem like candidates for primary variables, since the density curve differs between alive and dead patients.
+
+```{r}
+# plotting numerical variables against number of days lived
+#par(mf)
+for (i in 1:9){
+  plot(dat.num.c[, i+2], dat.num.c[, 1], main = colnames(dat.num.c)[i+2], xlab = 'var', ylab = 'n days')
+}
+```
+> Albumin seems to have the most linear distribution, but even it is not very strong. Most of the plots have a cluster of points around the mean of the x variable, which is evenly distributed along the y axis. 
+
+# Full fit regression analysis
+
+```{r}
+par(mfrow = c(2,2))
+dat.fullfit = lm(n_days ~ ., dat = dat.num[, -2])
+plot(dat.fullfit)
+par(mfrow = c(2,2))
+lm(log(n_days) ~ ., dat = dat.num[, -2]) %>% plot()
+par(mfrow = c(2,2))
+lm(sqrt(n_days) ~ ., dat = dat.num[, -2]) %>% plot()
+```
+> Linearity of plot seems questionable... Definite heteroscedascity. Residuals seem normal. 
+> Tried using log & sqrt transformation of outcome. Log didn't change much but sqrt helped Scale-Location lose its slope.
+
+# Variable selection
+
+```{r}
+library(leaps)
+dat.regsub = regsubsets(x = dat.num[, -1:-2], y = sqrt(dat.num[, 1]))
+dat.regsub.get = function(id, regsub = dat.regsub, y = 'n_days'){
+  model = summary(regsub)$which[id, ]
+  vars = names(which(model == TRUE))[-1] #removes intercept
+  formula = paste(y, '~',
+                  paste(vars, collapse = '+'))
+  as.formula(formula)
+}
+dat.aic.best = summary(dat.regsub)$bic %>% which.min() %>% dat.regsub.get() %>% lm(data = dat.num)# finds the model that has the lowest AIC
+coef(dat.aic.best)
+```
+
+```{r}
+library(caret)
+ctrl = trainControl(method = 'cv', number = 5)
+dat.regsub.models = sapply(1:8, dat.regsub.get)
+dat.cv.error = sapply(dat.regsub.models,
+                      function(x){train(x, data = dat.num, method = 'lm', trControl = ctrl)$results$RMSE})
+dat.cv.best = dat.cv.error %>% which.min() %>% dat.regsub.get() %>% lm(data = dat.num)
+```
+
+```{r}
+coef(dat.cv.best)
+plot(dat.cv.best)
+```
+# Logistic Regression
+
+```{r}
+dat.logistic = glm(sqrt(n_days) ~ ., family = 'binomial', data = dat.num[, -2])
+```
+
+
